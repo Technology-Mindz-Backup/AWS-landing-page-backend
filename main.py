@@ -1,80 +1,49 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-import requests
-import os
-from dotenv import load_dotenv
-
-# Load environment variables (for Salesforce creds)
-load_dotenv()
+import random, string
 
 app = FastAPI()
 
-# Allow your WordPress domain
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://staging-da31-prachitglobal.wpcomstaging.com",  # your WP site
-        "https://prachitglobal.com"
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
-@app.get("/")
-def root():
-    return {"message": "FastAPI backend is live on Render!"}
+def mock_resolve_customer(token: str):
+    fake_customer_id = "cust-" + "".join(random.choices(string.ascii_lowercase, k=6))
+    fake_account_id = "".join(random.choices("0123456789", k=12))
+    fake_product_code = "prod-" + "".join(random.choices(string.ascii_lowercase, k=4))
 
-
-@app.post("/form")
-async def handle_form(request: Request):
-    data = await request.json()
-    print("Received form data:", data)
-
-    # Extract form data
-    name = data.get("name")
-    zip_code = data.get("zip")
-    phone = data.get("phone")
-    company = data.get("company")
-    email = data.get("email")
-    preferences = data.get("preferences")
-
-    # Optional: validation
-    if not name or not email:
-        return {"status": "error", "message": "Name and email are required."}
-
-    # Prepare Salesforce data payload
-    salesforce_payload = {
-        "Name": name,
-        "Email": email,
-        "Phone": phone,
-        "Company": company,
-        "ZIP_Code__c": zip_code,
-        "Product_Preferences__c": preferences
+    return {
+        "CustomerIdentifier": fake_customer_id,
+        "ProductCode": fake_product_code,
+        "AccountId": fake_account_id,
+        "TokenReceived": token
     }
 
-    try:
-        # Example Salesforce API call (replace with your real endpoint + token)
-        sf_url = os.getenv("SALESFORCE_API_URL")  # e.g. https://your-instance.salesforce.com/services/data/vXX.X/sobjects/Lead/
-        sf_token = os.getenv("SALESFORCE_ACCESS_TOKEN")
+@app.post("/resolve-customer")
+async def resolve_customer(x_amzn_marketplace_token: str = Form(...)):
+    aws_info = mock_resolve_customer(x_amzn_marketplace_token)
+    return JSONResponse(content={"status": "resolved", "aws_customer": aws_info})
 
-        headers = {
-            "Authorization": f"Bearer {sf_token}",
-            "Content-Type": "application/json"
-        }
+@app.post("/submit-form")
+async def submit_form(request: Request):
+    data = await request.json()
+    print("Received form submission:", data)
+    sf_response = {
+        "status": "success",
+        "message": "Data received by mock Salesforce endpoint",
+        "received_data": data
+    }
+    return JSONResponse(content=sf_response)
 
-        # Send data to Salesforce
-        response = requests.post(sf_url, headers=headers, json=salesforce_payload)
+@app.get("/")
+def home():
+    return {"message": "Backend running successfully!"}
 
-        if response.status_code in [200, 201]:
-            return {"status": "success", "message": "Data sent to Salesforce successfully!"}
-        else:
-            return {
-                "status": "error",
-                "message": "Salesforce API failed",
-                "details": response.text
-            }
-
-    except Exception as e:
-        print("Error:", e)
-        return {"status": "error", "message": str(e)}
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
