@@ -1,0 +1,68 @@
+body {
+  font-family: Arial, sans-serif;
+  max-width: 600px;
+  margin: 30px auto;
+  background: #f5f5f5;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+h2 {
+  color: #333;
+}
+
+pre {
+  background: #fff;
+  border: 1px solid #ccc;
+  padding: 10px;
+  overflow-x: auto;
+  border-radius: 5px;
+}
+
+    #awsForm {
+  max-width: 500px;
+  margin: 30px auto;
+  background: #f8f9fa;
+  padding: 25px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+#awsForm .form-group {
+  margin-bottom: 15px;
+}
+
+#awsForm label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+#awsForm input, #awsForm textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 15px;
+}
+
+#awsForm textarea {
+  height: 80px;
+  resize: vertical;
+}
+
+#awsForm button {
+  background: #0073e6;
+  color: #fff;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+#awsForm button:hover {
+  background: #005bb5;
+}
