@@ -39,7 +39,7 @@ async def subscribe(name: str = Form(...), email: str = Form(...)):
     print(f"Generated token for {name}: {token}")
     
     # ✅ This is the critical line — must match exactly
-    redirect_url = f"http://localhost:8000/?x-amzn-marketplace-token={token}"
+    redirect_url = f"http://localhost:8001/?x-amzn-marketplace-token={token}"
     
     print(f"Redirecting user to {redirect_url}")
     return RedirectResponse(url=redirect_url, status_code=302)

@@ -1,65 +1,43 @@
 import requests
+import json
 
-BASE_URL = "http://localhost:8000"
+# --- Salesforce Endpoint ---
+SF_ENDPOINT = "https://technologymindz-dev-ed.my.site.com/awspublicapi/services/apexrest/TechnologyMindz/aws/receiveData"
 
-def test_homepage_with_token():
-    """Step 1: Simulate AWS redirect with a token"""
-    token = "mock-token-abc123"
-    url = f"{BASE_URL}/?x-amzn-marketplace-token={token}"
-    response = requests.get(url)
-    print("\n--- Step 1: Homepage ---")
-    print("Status:", response.status_code)
-    assert response.status_code == 200
-    assert token in response.text  # the token should appear in the HTML
+# --- Example Salesforce Payload ---
+sf_payload = {
+    "awsCustomerId": "cust-abc123",
+    "awsAccountId": "123456789012",
+    "productCode": "prod-demo1",
+    "subscriptionStatus": "Active",
+    "zipCode": "94107",
+    "phoneNumber": "+1-555-123-4567",
+    "companyInformation": "TechnologyMindz Test Company",
+    "email": "testuser@example.com"
+}
 
-    return token
+# --- Optional Headers (Salesforce may require these) ---
+headers = {
+    "Content-Type": "application/json",
+}
 
+# --- Send POST Request ---
+print(f"📤 Sending data to Salesforce: {SF_ENDPOINT}\n")
+print(json.dumps(sf_payload, indent=2))
 
-def test_resolve_customer(token):
-    """Step 2: Send token to /resolve-customer and receive AWS customer info"""
-    form_data = {"x_amzn_marketplace_token": token}
-    response = requests.post(f"{BASE_URL}/resolve-customer", data=form_data)
-    print("\n--- Step 2: Resolve Customer ---")
-    print("Status:", response.status_code)
-    print("Response:", response.json())
+try:
+    response = requests.post(SF_ENDPOINT, headers=headers, json=sf_payload, timeout=15)
+    response.raise_for_status()
 
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "resolved"
-    assert "aws_customer" in data
+    print("\n✅ Successfully received response from Salesforce!")
+    print("Status Code:", response.status_code)
+    try:
+        print("Response JSON:\n", json.dumps(response.json(), indent=2))
+    except json.JSONDecodeError:
+        print("Response Text:\n", response.text)
 
-    return data["aws_customer"]
-
-
-def test_submit_form(aws_customer):
-    """Step 3: Submit mock user info + AWS customer details to /submit-form"""
-    payload = {
-        "name": "Alice Johnson",
-        "email": "alice@example.com",
-        "company": "ExampleCorp",
-        "aws_customer": aws_customer
-    }
-    response = requests.post(f"{BASE_URL}/submit-form", json=payload)
-    print("\n--- Step 3: Submit Form ---")
-    print("Status:", response.status_code)
-    print("Response:", response.json())
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "success"
-    assert "received_data" in data
-
-    return data
-
-
-def run_full_flow_test():
-    print("🚀 Running AWS Marketplace → Salesforce full integration test")
-    token = test_homepage_with_token()
-    aws_info = test_resolve_customer(token)
-    final_response = test_submit_form(aws_info)
-    print("\n✅ Flow completed successfully!")
-    return final_response
-
-
-if __name__ == "__main__":
-    run_full_flow_test()
+except requests.exceptions.HTTPError as e:
+    print("❌ HTTP error:", e)
+    print("Response text:", response.text)
+except requests.exceptions.RequestException as e:
+    print("❌ Request failed:", e)

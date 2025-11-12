@@ -1,117 +1,126 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{{ title }}</title>
-    <link rel="stylesheet" href="/static/style.css" />
-  </head>
-  <body>
-    <h2>Welcome to the AWS Marketplace Landing Page</h2>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <h2>Welcome to the AWS Marketplace Landing Page</h2>
 
-    {% if token %}
-    <p>🟢 <b>Detected AWS Token:</b> <code>{{ token }}</code></p>
-    {% else %}
-    <p>⚠️ No token found. Please access this page via AWS Marketplace.</p>
-    {% endif %}
-     
-    <form id="awsForm">
-  <div class="form-group">
-    <label>Name*</label>
-    <input type="text" id="name" name="name" placeholder="Your Name" required>
-  </div>
+  {% if token %}
+  <p>🟢 <b>Detected AWS Token:</b> <code>{{ token }}</code></p>
+  {% else %}
+  <p>⚠️ No token found. Please access this page via AWS Marketplace.</p>
+  {% endif %}
 
-  <div class="form-group">
-    <label>ZIP Code*</label>
-    <input type="text" id="zip" name="zip" placeholder="ZIP Code" required>
-  </div>
+  <form id="awsForm">
+    <div class="form-group">
+      <label>Name*</label>
+      <input type="text" id="name" name="name" placeholder="Your Name" required>
+    </div>
 
-  <div class="form-group">
-    <label>Phone Number*</label>
-    <input type="tel" id="phone" name="phone" placeholder="Phone Number" required>
-  </div>
+    <div class="form-group">
+      <label>ZIP Code*</label>
+      <input type="text" id="zip" name="zip" placeholder="ZIP Code" required>
+    </div>
 
-  <div class="form-group">
-    <label>Company Information*</label>
-    <input type="text" id="company" name="company" placeholder="Company Name / Info" required>
-  </div>
+    <div class="form-group">
+      <label>Phone Number*</label>
+      <input type="tel" id="phone" name="phone" placeholder="Phone Number" required>
+    </div>
 
-  <div class="form-group">
-    <label>Email*</label>
-    <input type="email" id="email" name="email" placeholder="Email Address" required>
-  </div>
-   <!-- Hidden input to send session_id -->
- <input type="hidden" id="aws_token" name="x_amzn_marketplace_token" value="{{ token }}">
+    <div class="form-group">
+      <label>Company Information*</label>
+      <input type="text" id="company" name="company" placeholder="Company Name / Info" required>
+    </div>
 
+    <div class="form-group">
+      <label>Email*</label>
+      <input type="email" id="email" name="email" placeholder="Email Address" required>
+    </div>
 
-  <div class="form-group">
-    <label>Product Setup Preferences</label>
-    <textarea name="preferences" id="productSetupPreferences" placeholder="Tell us about your setup preferences..."></textarea>
-  </div>
+    <div class="form-group">
+      <label>Product Setup Preferences</label>
+      <textarea name="preferences" id="productSetupPreferences" placeholder="Tell us about your setup preferences..."></textarea>
+    </div>
 
-  <button type="submit">Submit</button>
-</form>
+    <!-- Hidden fields -->
+    <input type="hidden" id="aws_token" name="x_amzn_marketplace_token" value="{{ token }}">
+    <input type="hidden" id="session_id" name="session_id" value="{{ session_id }}">
 
-<div id="formResponse" style="margin-top: 15px;"></div>
+    <button type="submit">Submit</button>
+  </form>
 
-    <h3>📋 Response:</h3>
-    <pre id="result">Waiting for submission...</pre>
+  <div id="formResponse" style="margin-top: 15px;"></div>
 
+  <h3>📋 Response:</h3>
+  <pre id="result">Waiting for submission...</pre>
 
+  <script>
+   document.getElementById("awsForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-    <script>
-document.getElementById("awsForm").addEventListener("submit", async function(e) {
-    e.preventDefault();
-    const formData = Object.fromEntries(new FormData(this).entries());
-    
-    const response = await fetch("/submit-form", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData)
+  const token = document.getElementById("aws_token").value;
+  const session_id = document.getElementById("session_id").value;
+
+  if (!session_id) {
+    alert("Missing session ID. Please refresh the page and try again.");
+    return;
+  }
+
+  try {
+    // Step 1: Resolve AWS Customer (mock AWS ResolveCustomer)
+    const formData = new FormData();
+    formData.append("x_amzn_marketplace_token", token);
+
+    const resolveRes = await fetch("/resolve-customer", {
+      method: "POST",
+      body: formData
     });
-    const result = await response.json();
-    document.getElementById("response").textContent = JSON.stringify(result, null, 4);
+    const awsData = await resolveRes.json();
+
+    if (!awsData || !awsData.aws_customer) {
+      alert("Could not resolve AWS customer. Please try again.");
+      return;
+    }
+
+    // Step 2: Prepare the payload in Salesforce format
+    const aws = awsData.aws_customer;
+    const payload = {
+      session_id: session_id, // still include so backend can validate
+      name: document.getElementById("name").value,
+      awsCustomerId: aws.CustomerIdentifier,
+      awsAccountId: aws.AccountId,
+      productCode: aws.ProductCode,
+      subscriptionStatus: "Active",
+      zipCode: document.getElementById("zip").value,
+      phoneNumber: document.getElementById("phone").value,
+      companyInformation: document.getElementById("company").value,
+      email: document.getElementById("email").value,
+      productSetupPreferences: document.getElementById("productSetupPreferences").value
+    };
+
+    console.log("📦 Payload to backend:", payload);
+
+    // Step 3: Send to backend (FastAPI -> Salesforce)
+    const sfRes = await fetch("/submit-form", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const sfData = await sfRes.json();
+
+    // Step 4: Show result
+    document.getElementById("result").textContent = JSON.stringify(sfData, null, 2);
+
+  } catch (err) {
+    document.getElementById("result").textContent = "❌ Error: " + err.message;
+  }
 });
-</script>
 
-    <script>
-    document.getElementById("awsForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const token = document.getElementById("aws_token").value;
-      const formData = new FormData();
-      formData.append("x_amzn_marketplace_token", token);
-
-      // Step 1: Resolve the AWS token
-      const resolveRes = await fetch("/resolve-customer", {
-        method: "POST",
-        body: formData
-      });
-      const awsData = await resolveRes.json();
-
-      // Step 2: Combine form data + AWS customer info
-      const payload = {
-        name: document.getElementById("name").value,
-        zipCode: document.getElementById("zip").value,
-        phoneNumber: document.getElementById("phone").value,
-        companyInformation: document.getElementById("company").value,
-        email: document.getElementById("email").value,
-        productSetupPreferences: document.getElementById("productSetupPreferences").value,
-        aws_customer: awsData.aws_customer
-      };
-
-      // Step 3: Send to backend and get full response
-      const sfRes = await fetch("/submit-form", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const sfData = await sfRes.json();
-
-      // Step 4: Show result in UI
-      document.getElementById("result").textContent = JSON.stringify(sfData, null, 2);
-    });
   </script>
-  </body>
+</body>
 </html>
